@@ -96,6 +96,13 @@ publishing {
             }
         }
     }
+    repositories {
+        maven {
+            url = "https://nexus.darkcube.eu/repository/dasbabypixel/"
+            credentials PasswordCredentials
+            name = "DasBabyPixel"
+        }
+    }
 }
 
 signing {
