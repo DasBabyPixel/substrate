@@ -56,7 +56,7 @@ public abstract class AheadOfTimeBase<Art> {
     protected abstract File file(Art a);
     protected abstract Scope scope(Art a);
     protected abstract String classifier(Art a);
-     protected abstract String artifactId(Art a);
+    protected abstract String artifactId(Art a);
     protected abstract String groupId(Art a);
     protected abstract String version(Art a);
 
@@ -69,71 +69,79 @@ public abstract class AheadOfTimeBase<Art> {
         } catch (MalformedURLException ex) {
             throw raise("Can't initialize classloader", ex);
         }
-        List<String> libsCp = new ArrayList<>();
-        for (Art a : artifacts) {
-            final File aFile = file(a);
-            if (aFile == null) {
-                continue;
-            }
-            String n = aFile.getName();
-            if (!n.endsWith(".jar")) {
-                continue;
-            }
-            if (Scope.PROVIDED == scope(a)) {
-                continue;
-            }
-            if ("bck2brwsr".equals(classifier(a))) {
-                continue;
-            }
-            final String libNameJs = n.substring(0, n.length() - 4) + ".js";
-            File js = libraryPath(libNameJs);
-            try {
-                js.getParentFile().mkdirs();
-                aotLibrary(a, artifacts, js, loader, libsCp);
-            } catch (IOException ex) {
-                throw raise("Can't compile " + aFile, ex);
-            }
-        }
-
         try {
-            if (mainJavaScript().lastModified() > mainJar().lastModified()) {
-                logInfo("Skipping " + mainJavaScript() + " as it already exists.");
-            } else {
-                logInfo("Generating " + mainJavaScript());
-                Bck2Brwsr withLibsCp = Bck2Brwsr.newCompiler().library(libsCp.toArray(new String[0]));
-                Bck2Brwsr c = Bck2BrwsrJars.configureFrom(withLibsCp, mainJar(), loader, ignoreBootClassPath());
-                if (exports() != null) {
-                    for (String e : exports()) {
-                        if (e != null) {
-                            c = c.addExported(e.replace('.', '/'));
+            List<String> libsCp = new ArrayList<>();
+            for (Art a : artifacts) {
+                final File aFile = file(a);
+                if (aFile == null) {
+                    continue;
+                }
+                String n = aFile.getName();
+                if (!n.endsWith(".jar")) {
+                    continue;
+                }
+                if (Scope.PROVIDED == scope(a)) {
+                    continue;
+                }
+                if ("bck2brwsr".equals(classifier(a))) {
+                    continue;
+                }
+                final String libNameJs = n.substring(0, n.length() - 4) + ".js";
+                File js = libraryPath(libNameJs);
+                try {
+                    js.getParentFile().mkdirs();
+                    aotLibrary(a, artifacts, js, loader, libsCp);
+                } catch (IOException ex) {
+                    throw raise("Can't compile " + aFile, ex);
+                }
+            }
+
+            try {
+                if (mainJavaScript().lastModified() > mainJar().lastModified()) {
+                    logInfo("Skipping " + mainJavaScript() + " as it already exists.");
+                } else {
+                    logInfo("Generating " + mainJavaScript());
+                    Bck2Brwsr withLibsCp = Bck2Brwsr.newCompiler().library(libsCp.toArray(new String[0]));
+                    Bck2Brwsr c = Bck2BrwsrJars.configureFrom(withLibsCp, mainJar(), loader, ignoreBootClassPath());
+
+                    if (exports() != null) {
+                        for (String e : exports()) {
+                            if (e != null) {
+                                c = c.addExported(e.replace('.', '/'));
+                            }
                         }
                     }
+                    try (Writer w = new OutputStreamWriter(new FileOutputStream(mainJavaScript()), "UTF-8")) {
+                        c.obfuscation(obfuscation()).generate(w);
+                    }
                 }
-                try (Writer w = new OutputStreamWriter(new FileOutputStream(mainJavaScript()), "UTF-8")) {
-                    c.
-                            obfuscation(obfuscation()).
-                            generate(w);
-                }
+            } catch (IOException ex) {
+                throw raise("Cannot generate script for " + mainJar(), ex);
             }
-        } catch (IOException ex) {
-            throw raise("Cannot generate script for " + mainJar(), ex);
-        }
 
-        try (Writer w = new OutputStreamWriter(new FileOutputStream(vm()), "UTF-8")) {
-            Bck2Brwsr.newCompiler().
-                    obfuscation(obfuscation()).
-                    standalone(false).
-                    resources(new Bck2Brwsr.Resources() {
+            try (Writer w = new OutputStreamWriter(new FileOutputStream(vm()), "UTF-8")) {
+                Bck2Brwsr
+                        .newCompiler()
+                        .obfuscation(obfuscation())
+                        .standalone(false)
+                        .resources(new Bck2Brwsr.Resources() {
 
-                        @Override
-                        public InputStream get(String resource) throws IOException {
-                            return null;
-                        }
-                    }).
-                    generate(w);
-            w.close();
-        } catch (IOException ex) {
-            throw raise("Can't compile", ex);
+                            @Override
+                            public InputStream get(String resource) throws IOException {
+                                return null;
+                            }
+                        })
+                        .generate(w);
+                w.close();
+            } catch (IOException ex) {
+                throw raise("Can't compile", ex);
+            }
+        } finally {
+            try {
+                loader.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -183,11 +191,10 @@ public abstract class AheadOfTimeBase<Art> {
             if (exports() != null) {
                 c = c.addExported(exports());
             }
-            c.
-                    obfuscation(obfuscation()).
-                    generate(w);
+            c.obfuscation(obfuscation()).generate(w);
         }
     }
+
     private URLClassLoader buildClassLoader(File root, Iterable<Art> deps) throws MalformedURLException {
         List<URL> arr = new ArrayList<>();
         if (root != null) {
@@ -206,7 +213,7 @@ public abstract class AheadOfTimeBase<Art> {
     }
 
     private static <E extends Exception> E raise(Class<E> type, Throwable ex) throws E {
-        throw (E)ex;
+        throw (E) ex;
     }
 
     public enum Scope {
